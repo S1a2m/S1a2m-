@@ -1,0 +1,9 @@
+[
+  "osv-scanner", "oss-fuzz", "go-containerregistry", "tink", "zx",
+  "gson", "guava", "flatbuffers", "closure-compiler", "go-github",
+  "wire", "re2", "jsonnet", "boringssl", "googletest", "benchmark",
+  "gvisor", "go-cmp", "tsunami-security-scanner", "container-diff",
+  "go-licenses", "cel-go", "secrets-gradle-plugin", "ksp", "protobuf-gradle-plugin",
+  "jib", "dagger", "safetext", "open-location-code", "go-cloud",
+  "quiche", "s2geometry", "breakpad", "snappy", "leveldb", "skia-buildbot"
+]

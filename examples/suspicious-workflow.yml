@@ -1,0 +1,15 @@
+name: Deliberately unsafe example for OFFLINE unit tests ONLY
+on:
+  pull_request_target:
+permissions:
+  contents: write
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: test
+        run: npm test
+      - run: echo "${{ github.event.pull_request.title }}"
