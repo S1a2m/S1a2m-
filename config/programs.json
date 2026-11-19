@@ -1,0 +1,11 @@
+[
+  {"name":"Google Bug Hunters", "category":"direct bounty / program portal", "official_url":"https://bughunters.google.com/"},
+  {"name":"Google OSS VRP rules", "category":"open-source program, supply-chain focus", "official_url":"https://bughunters.google.com/about/rules/open-source/google-open-source-software-vulnerability-reward-program-rules"},
+  {"name":"Microsoft MSRC", "category":"direct bounty", "official_url":"https://www.microsoft.com/en-us/msrc/bounty"},
+  {"name":"Apple Security Bounty", "category":"direct bounty", "official_url":"https://security.apple.com/bounty/"},
+  {"name":"Meta Bug Bounty", "category":"direct bounty", "official_url":"https://bugbounty.meta.com/"},
+  {"name":"Mozilla Bug Bounty", "category":"direct bounty; no automated scanning of production", "official_url":"https://www.mozilla.org/en-US/security/bug-bounty/faq-webapp/"},
+  {"name":"Proton Bug Bounty", "category":"direct bounty", "official_url":"https://proton.me/security/bug-bounty"},
+  {"name":"Telegram Bug Bounty", "category":"direct bounty", "official_url":"https://core.telegram.org/bug-bounty"},
+  {"name":"Zoho Bug Bounty", "category":"direct bounty", "official_url":"https://bugbounty.zohocorp.com/bb/info"}
+]

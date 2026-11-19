@@ -1,0 +1,67 @@
+{
+  "id": "GHSA-6wmf-4rv5-p3rp",
+  "aliases": [
+    "CVE-2026-109619"
+  ],
+  "published": "2026-10-21T00:00:00Z",
+  "affected": [
+    {
+      "package": {
+        "ecosystem": "PHP",
+        "name": "php-src"
+      },
+      "ranges": [
+        {
+          "type": "SEMVER",
+          "events": [
+            {
+              "introduced": "8.2.0"
+            },
+            {
+              "fixed": "8.2.35"
+            }
+          ]
+        },
+        {
+          "type": "SEMVER",
+          "events": [
+            {
+              "introduced": "8.3.0"
+            },
+            {
+              "fixed": "8.3.36"
+            }
+          ]
+        },
+        {
+          "type": "SEMVER",
+          "events": [
+            {
+              "introduced": "8.4.0"
+            },
+            {
+              "fixed": "8.4.27"
+            }
+          ]
+        },
+        {
+          "type": "SEMVER",
+          "events": [
+            {
+              "introduced": "8.5.0"
+            },
+            {
+              "fixed": "8.5.12"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "type": "ADVISORY",
+      "url": "https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp"
+    }
+  ]
+}
