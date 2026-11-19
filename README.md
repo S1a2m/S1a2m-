@@ -123,19 +123,21 @@ the installed versions remain unverified. Use `--inventory-url` for a custom pat
 ### Review a page by URL
 
 For a page approved for automated HTTPS header review, record the exact page
-URL and the applicable program rule or owner approval in a local scope file.
+URL and the applicable program rule or owner approval in `approved-pages.json`
+in the directory where you run the command.
 
 ```json
 {"activity":"https-header-review","approved":true,"rules_reference":"Program rule or owner approval","urls":["https://example.com/"]}
 ```
 
 ```sh
-python hunter.py site https://example.com/ --scope approved-pages.json
+python hunter.py site https://example.com/
 ```
 
 This makes one ordinary HTTPS GET and reads the response headers without
 following redirects or consuming the response body. Observations about absent
-headers need context from the program rules and the application. Use the
+headers need context from the program rules and the application. Use `--scope`
+if your approval file is stored elsewhere. Use the
 inventory review when assessing specific CVEs.
 
 ### GitHub Actions workflow review

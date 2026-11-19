@@ -236,7 +236,8 @@ def main():
         parser = argparse.ArgumentParser(prog="hunter.py site",
                                          description="Review headers on one approved HTTPS page.")
         parser.add_argument("url")
-        parser.add_argument("--scope", required=True, type=Path)
+        parser.add_argument("--scope", type=Path, default=Path("approved-pages.json"),
+                            help="Approval file (default: approved-pages.json)")
         args = parser.parse_args(sys.argv[2:])
         try:
             print(json.dumps(review(args.url, args.scope), indent=2))
