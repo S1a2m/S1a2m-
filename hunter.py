@@ -230,11 +230,24 @@ def advisory_main(argv):
 
 
 def main():
+    if sys.argv[1:2] == ["site"]:
+        from site_review import review
+
+        parser = argparse.ArgumentParser(prog="hunter.py site",
+                                         description="Review headers on one approved HTTPS page.")
+        parser.add_argument("url")
+        parser.add_argument("--scope", required=True, type=Path)
+        args = parser.parse_args(sys.argv[2:])
+        try:
+            print(json.dumps(review(args.url, args.scope), indent=2))
+        except (OSError, TypeError, ValueError, AttributeError) as exc:
+            parser.error(str(exc))
+        return
     if sys.argv[1:2] == ["advisories"]:
         advisory_main(sys.argv[2:])
         return
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.epilog = "Run hunter.py advisories --help for offline advisory inventory review."
+    parser.epilog = "See hunter.py site --help and hunter.py advisories --help for other review modes."
     parser.add_argument("--checkout", type=Path, help="Approved local checkout")
     parser.add_argument("--scope", type=Path, help="Human-approved local JSON scope")
     parser.add_argument("--demo", action="store_true", help="Review the bundled synthetic fixture offline")

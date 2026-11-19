@@ -120,6 +120,24 @@ For this example, approve `https://example.com/.well-known/hunter-inventory.json
 If the endpoint is missing or unavailable, the command exits with an error and
 the installed versions remain unverified. Use `--inventory-url` for a custom path.
 
+### Review a page by URL
+
+For a page approved for automated HTTPS header review, record the exact page
+URL and the applicable program rule or owner approval in a local scope file.
+
+```json
+{"activity":"https-header-review","approved":true,"rules_reference":"Program rule or owner approval","urls":["https://example.com/"]}
+```
+
+```sh
+python hunter.py site https://example.com/ --scope approved-pages.json
+```
+
+This makes one ordinary HTTPS GET and reads the response headers without
+following redirects or consuming the response body. Observations about absent
+headers need context from the program rules and the application. Use the
+inventory review when assessing specific CVEs.
+
 ### GitHub Actions workflow review
 
 Claude-BugHunter's human triage and evidence-handling approach informed the reports. The workbench uses its existing Python analyzer. See the [upstream project](https://github.com/elementalsouls/Claude-BugHunter) and its [license notice](https://github.com/elementalsouls/Claude-BugHunter/blob/main/NOTICE). No upstream code or skills were copied.
