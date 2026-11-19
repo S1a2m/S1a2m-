@@ -18,6 +18,7 @@ from packaging.version import Version as PythonVersion
 CVE_ID = re.compile(r"CVE-[0-9]{4}-[0-9]{4,}")
 MAX_ADVISORY_BYTES = 16 * 1024 * 1024
 MAX_INVENTORY_BYTES = 2 * 1024 * 1024
+SITE_INVENTORY_PATH = "/.well-known/hunter-inventory.json"
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -59,6 +60,15 @@ def package_key(ecosystem, name):
 class NoInventoryRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def inventory_url_for_site(site):
+    endpoint = urlsplit(site)
+    if (endpoint.scheme != "https" or not endpoint.hostname or endpoint.path not in {"", "/"}
+            or endpoint.username is not None or endpoint.password is not None
+            or "?" in site or "#" in site or any(char.isspace() for char in site)):
+        raise ValueError("--site requires an HTTPS site origin, such as https://example.com")
+    return f"https://{endpoint.netloc}{SITE_INVENTORY_PATH}"
 
 
 def fetch_inventory(url, scope, token=None):

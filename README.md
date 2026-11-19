@@ -108,6 +108,18 @@ GET to the exact approved URL over verified HTTPS, disallows redirects and check
 every returned asset ID against the approved list. Advisory matching still uses
 local snapshots. A site's homepage cannot substitute for its inventory endpoint.
 
+For a shorter command, serve the inventory at `/.well-known/hunter-inventory.json`
+on the site. Put the full endpoint URL in the approval file's `inventory_url`
+once. Then pass only the HTTPS site URL when choosing the site to review:
+
+```sh
+python hunter.py advisories --scope approved-https.json --site https://example.com --osv pypi.zip
+```
+
+For this example, approve `https://example.com/.well-known/hunter-inventory.json`.
+If the endpoint is missing or unavailable, the command exits with an error and
+the installed versions remain unverified. Use `--inventory-url` for a custom path.
+
 ### GitHub Actions workflow review
 
 Claude-BugHunter's human triage and evidence-handling approach informed the reports. The workbench uses its existing Python analyzer. See the [upstream project](https://github.com/elementalsouls/Claude-BugHunter) and its [license notice](https://github.com/elementalsouls/Claude-BugHunter/blob/main/NOTICE). No upstream code or skills were copied.

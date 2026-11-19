@@ -9,6 +9,7 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from advisories import assess_version, report
+from hunter import advisory_main
 
 
 class AdvisoryTests(unittest.TestCase):
@@ -132,6 +133,31 @@ class AdvisoryTests(unittest.TestCase):
             self.assertIsNone(build.call_args.args[0].redirect_request(None, None, 302, "", {}, ""))
             self.assertEqual(result["inventory_source"], "https")
             self.assertEqual(result["components_reviewed"], 3)
+
+    def test_site_cli_derives_exact_endpoint_and_preserves_scope(self):
+        site = "https://example.test"
+        endpoint = site + "/.well-known/hunter-inventory.json"
+        scope = self.write_json("site-scope.json", {
+            "activity": "https-inventory-review", "approved": True,
+            "rules_reference": "synthetic approval", "assets": ["test-service"],
+            "inventory_url": endpoint,
+        })
+        with ZipFile(self.archive, "w"):
+            pass
+        args = ["--scope", str(scope), "--osv", str(self.archive), "--site"]
+        with patch("advisories.build_opener") as build, patch("sys.stdout"), patch("sys.stderr"):
+            for unapproved in ["http://example.test", site + "/other", "https://other.example.test"]:
+                with self.assertRaises(SystemExit) as error:
+                    advisory_main([*args, unapproved])
+                self.assertEqual(error.exception.code, 2)
+            build.assert_not_called()
+            open_request = build.return_value.open
+            response = open_request.return_value.__enter__.return_value
+            response.status = 200
+            response.headers.get_content_type.return_value = "application/json"
+            response.read.return_value = self.inventory.read_bytes()
+            advisory_main([*args, site + "/"])
+            self.assertEqual(open_request.call_args.args[0].full_url, endpoint)
 
     def test_semver_boundaries_and_unsupported_ordering(self):
         affected = {"ranges": [{"type": "SEMVER", "events": [

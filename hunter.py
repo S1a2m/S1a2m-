@@ -201,7 +201,7 @@ def run(demo: bool, checkout: Path | None, scope_file: Path | None):
 
 
 def advisory_main(argv):
-    from advisories import report
+    from advisories import inventory_url_for_site, report
 
     parser = argparse.ArgumentParser(
         prog="hunter.py advisories", description="Review approved local or HTTPS software inventory."
@@ -210,6 +210,7 @@ def advisory_main(argv):
     inventory = parser.add_mutually_exclusive_group(required=True)
     inventory.add_argument("--inventory", type=Path)
     inventory.add_argument("--inventory-url", help="Exact owner-approved HTTPS inventory endpoint")
+    inventory.add_argument("--site", help="HTTPS site URL, such as https://example.com")
     parser.add_argument("--osv", required=True, action="append", type=Path,
                         help="Local OSV ZIP snapshot or single-record JSON file (repeatable)")
     parser.add_argument("--year", type=int, default=2026)
@@ -219,9 +220,10 @@ def advisory_main(argv):
     if not 1 <= args.year <= 9999:
         parser.error("--year must be between 1 and 9999")
     try:
+        inventory_url = inventory_url_for_site(args.site) if args.site is not None else args.inventory_url
         result = report(args.scope, args.inventory, args.osv, args.year, args.kev, args.epss,
-                        inventory_url=args.inventory_url,
-                        token=os.environ.get("HUNTER_INVENTORY_TOKEN") if args.inventory_url else None)
+                        inventory_url=inventory_url,
+                        token=os.environ.get("HUNTER_INVENTORY_TOKEN") if inventory_url else None)
     except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, BadZipFile) as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2))
