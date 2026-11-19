@@ -8,6 +8,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from itertools import chain
 from pathlib import Path
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from zipfile import ZipFile
 
 from packaging.utils import canonicalize_name
@@ -15,6 +17,7 @@ from packaging.version import Version as PythonVersion
 
 CVE_ID = re.compile(r"CVE-[0-9]{4}-[0-9]{4,}")
 MAX_ADVISORY_BYTES = 16 * 1024 * 1024
+MAX_INVENTORY_BYTES = 2 * 1024 * 1024
 SEMVER = re.compile(
     r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
     r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
@@ -53,10 +56,37 @@ def package_key(ecosystem, name):
     return ecosystem, canonicalize_name(name) if ecosystem == "PyPI" else name
 
 
-def approved_inventory(scope_path, inventory_path):
+class NoInventoryRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def fetch_inventory(url, scope, token=None):
+    if scope.get("inventory_url") != url:
+        raise ValueError("inventory URL must exactly match the approved scope")
+    endpoint = urlsplit(url)
+    if (endpoint.scheme != "https" or not endpoint.hostname or not endpoint.path
+            or endpoint.username is not None or endpoint.password is not None
+            or endpoint.query or endpoint.fragment or any(char.isspace() for char in url)):
+        raise ValueError("inventory URL must be HTTPS with a path and without credentials, query or fragment")
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = Request(url, headers=headers)
+    with build_opener(NoInventoryRedirect()).open(request, timeout=10) as response:
+        if response.status != 200 or response.headers.get_content_type() != "application/json":
+            raise ValueError("inventory endpoint must return HTTP 200 with application/json")
+        body = response.read(MAX_INVENTORY_BYTES + 1)
+    if len(body) > MAX_INVENTORY_BYTES:
+        raise ValueError("inventory response exceeds the size limit")
+    return json.loads(body)
+
+
+def approved_inventory(scope_path, inventory_path, *, inventory_url=None, token=None):
     scope = load_json(scope_path)
-    if scope.get("activity") != "offline-advisory-review" or scope.get("approved") is not True:
-        raise ValueError("scope must explicitly approve offline-advisory-review")
+    activity = "https-inventory-review" if inventory_url else "offline-advisory-review"
+    if scope.get("activity") != activity or scope.get("approved") is not True:
+        raise ValueError(f"scope must explicitly approve {activity}")
     required_text(scope, "rules_reference")
     assets = scope.get("assets")
     if not isinstance(assets, list) or not assets or any(
@@ -65,7 +95,10 @@ def approved_inventory(scope_path, inventory_path):
         raise ValueError("scope must list exact asset identifiers")
     allowed = set(assets)
     index = defaultdict(set)
-    for row in load_json(inventory_path)["components"]:
+    inventory = (
+        fetch_inventory(inventory_url, scope, token) if inventory_url else load_json(inventory_path)
+    )
+    for row in inventory["components"]:
         asset = required_text(row, "asset")
         if asset not in allowed:
             raise ValueError(f"inventory asset is outside approved scope: {asset}")
@@ -172,8 +205,9 @@ def epss_scores(path, requested):
     return scores, metadata.group(1) if metadata else None
 
 
-def report(scope, inventory, archives, year=2026, kev=None, epss=None):
-    index = approved_inventory(scope, inventory)
+def report(scope, inventory, archives, year=2026, kev=None, epss=None, *,
+           inventory_url=None, token=None):
+    index = approved_inventory(scope, inventory, inventory_url=inventory_url, token=token)
     kev_data = load_json(kev) if kev else {}
     known_exploited = {row["cveID"] for row in kev_data["vulnerabilities"]} if kev else set()
     findings = {}
@@ -262,6 +296,7 @@ def report(scope, inventory, archives, year=2026, kev=None, epss=None):
         component_coverage[status] += 1
     return dict(
         publication_year=year, archives=[path.name for path in archives],
+        inventory_source="https" if inventory_url else "local",
         kev_snapshot=kev.name if kev else None, epss_snapshot=epss.name if epss else None,
         sources=dict(
             osv=[dict(file=path.name, latest_record_modified_utc=(

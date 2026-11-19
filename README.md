@@ -87,8 +87,29 @@ They cover CVE-2026-109618 and CVE-2026-109619. Use your distribution's
 advisories for downstream builds or backports, and check end-of-life release
 lines separately.
 
+### HTTPS inventory review
+
+Point the advisory check at an inventory endpoint you operate or are authorized
+to use. The endpoint should return the same inventory JSON as the local file
+example, with HTTP 200 and Content-Type `application/json`. Keep deployed
+inventory endpoints access-controlled. For bearer authentication, supply the
+token in the local `HUNTER_INVENTORY_TOKEN` environment variable.
+
+```json
+{"activity":"https-inventory-review","approved":true,"rules_reference":"Internal approval record","assets":["web-prod"],"inventory_url":"https://inventory.example.net/api/components"}
+```
+
+```sh
+python hunter.py advisories --scope approved-https.json --inventory-url https://inventory.example.net/api/components --osv pypi.zip
+```
+
+Keep the scope file under the operator's control. The command makes a read-only
+GET to the exact approved URL over verified HTTPS, disallows redirects and checks
+every returned asset ID against the approved list. Advisory matching still uses
+local snapshots. A site's homepage cannot substitute for its inventory endpoint.
+
 ### GitHub Actions workflow review
 
 Claude-BugHunter's human triage and evidence-handling approach informed the reports. The workbench uses its existing Python analyzer. See the [upstream project](https://github.com/elementalsouls/Claude-BugHunter) and its [license notice](https://github.com/elementalsouls/Claude-BugHunter/blob/main/NOTICE). No upstream code or skills were copied.
 
-The runner is offline and uses no API credentials. The legacy environment example is historical. GitHub Actions runs fixture checks on pull requests targeting main and supports manual runs. The CI job installs dependencies separately from the offline runner.
+The workflow review runs offline and uses no API credentials. The legacy environment example is historical. GitHub Actions runs fixture checks on pull requests targeting main and supports manual runs.

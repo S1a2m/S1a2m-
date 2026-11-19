@@ -6,6 +6,7 @@ import argparse
 from datetime import date
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -203,10 +204,12 @@ def advisory_main(argv):
     from advisories import report
 
     parser = argparse.ArgumentParser(
-        prog="hunter.py advisories", description="Review approved software inventory offline."
+        prog="hunter.py advisories", description="Review approved local or HTTPS software inventory."
     )
     parser.add_argument("--scope", required=True, type=Path)
-    parser.add_argument("--inventory", required=True, type=Path)
+    inventory = parser.add_mutually_exclusive_group(required=True)
+    inventory.add_argument("--inventory", type=Path)
+    inventory.add_argument("--inventory-url", help="Exact owner-approved HTTPS inventory endpoint")
     parser.add_argument("--osv", required=True, action="append", type=Path,
                         help="Local OSV ZIP snapshot or single-record JSON file (repeatable)")
     parser.add_argument("--year", type=int, default=2026)
@@ -216,7 +219,9 @@ def advisory_main(argv):
     if not 1 <= args.year <= 9999:
         parser.error("--year must be between 1 and 9999")
     try:
-        result = report(args.scope, args.inventory, args.osv, args.year, args.kev, args.epss)
+        result = report(args.scope, args.inventory, args.osv, args.year, args.kev, args.epss,
+                        inventory_url=args.inventory_url,
+                        token=os.environ.get("HUNTER_INVENTORY_TOKEN") if args.inventory_url else None)
     except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, BadZipFile) as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2))

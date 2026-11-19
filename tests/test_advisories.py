@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from advisories import assess_version, report
@@ -104,6 +105,33 @@ class AdvisoryTests(unittest.TestCase):
         })
         with self.assertRaisesRegex(ValueError, "outside approved scope"):
             report(self.scope, inventory, [self.archive])
+
+    def test_https_inventory_requests_only_approved_endpoint(self):
+        url = "https://inventory.example.test/api/components"
+        scope = self.write_json("https-scope.json", {
+            "activity": "https-inventory-review", "approved": True,
+            "rules_reference": "synthetic approval", "assets": ["test-service"],
+            "inventory_url": url,
+        })
+        with ZipFile(self.archive, "w"):
+            pass
+        with patch("advisories.build_opener") as build:
+            with self.assertRaisesRegex(ValueError, "exactly match"):
+                report(scope, None, [self.archive], inventory_url=url + "/other")
+            build.assert_not_called()
+            open_request = build.return_value.open
+            response = open_request.return_value.__enter__.return_value
+            response.status = 200
+            response.headers.get_content_type.return_value = "application/json"
+            response.read.return_value = self.inventory.read_bytes()
+            result = report(scope, None, [self.archive], inventory_url=url, token="synthetic")
+            request = open_request.call_args.args[0]
+            self.assertEqual(request.full_url, url)
+            self.assertEqual(request.get_method(), "GET")
+            self.assertEqual(request.get_header("Authorization"), "Bearer synthetic")
+            self.assertIsNone(build.call_args.args[0].redirect_request(None, None, 302, "", {}, ""))
+            self.assertEqual(result["inventory_source"], "https")
+            self.assertEqual(result["components_reviewed"], 3)
 
     def test_semver_boundaries_and_unsupported_ordering(self):
         affected = {"ranges": [{"type": "SEMVER", "events": [
