@@ -72,8 +72,23 @@ when they share a CVE alias. An empty findings list covers only the matching
 data in these snapshots. Vendor products outside the snapshots require
 additional vendor data.
 
+`component_coverage` counts each distinct asset/package/version once.
+`review_required` takes precedence when any relevant comparison is unresolved.
+`no_version_match` means the supplied records for that package and year were
+evaluated without an affected-version match. `no_advisory_data` means none of
+the supplied records in that year mapped to the package. Source metadata shows
+the newest OSV record modification timestamp, the KEV catalog version and the
+EPSS score date when available.
+
+For upstream PHP builds in the 8.2–8.5 release lines, use ecosystem `PHP`
+and package `php-src`. Add these two vendor-derived records to the invocation
+with `--osv data/php/GHSA-w8hw-w9fx-j79w.json --osv data/php/GHSA-6wmf-4rv5-p3rp.json`.
+They cover CVE-2026-109618 and CVE-2026-109619. Use your distribution's
+advisories for downstream builds or backports, and check end-of-life release
+lines separately.
+
 ### GitHub Actions workflow review
 
 Claude-BugHunter's human triage and evidence-handling approach informed the reports. The workbench uses its existing Python analyzer. See the [upstream project](https://github.com/elementalsouls/Claude-BugHunter) and its [license notice](https://github.com/elementalsouls/Claude-BugHunter/blob/main/NOTICE). No upstream code or skills were copied.
 
-The runner is offline and uses no API credentials. The legacy environment example is historical. The GitHub Actions workflow is manually dispatched and runs fixture checks. Dependency updates go through requirements review and the offline fixture checks. The CI job installs dependencies separately from the offline runner.
+The runner is offline and uses no API credentials. The legacy environment example is historical. GitHub Actions runs fixture checks on pull requests targeting main and supports manual runs. The CI job installs dependencies separately from the offline runner.

@@ -207,7 +207,8 @@ def advisory_main(argv):
     )
     parser.add_argument("--scope", required=True, type=Path)
     parser.add_argument("--inventory", required=True, type=Path)
-    parser.add_argument("--osv", required=True, action="append", type=Path)
+    parser.add_argument("--osv", required=True, action="append", type=Path,
+                        help="Local OSV ZIP snapshot or single-record JSON file (repeatable)")
     parser.add_argument("--year", type=int, default=2026)
     parser.add_argument("--kev", type=Path)
     parser.add_argument("--epss", type=Path)

@@ -6,6 +6,7 @@ import json
 import re
 from collections import defaultdict
 from datetime import datetime, timezone
+from itertools import chain
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -132,6 +133,13 @@ def assess_version(version, ecosystem, affected):
 
 def records(paths):
     for path in paths:
+        if path.suffix.lower() == ".json":
+            with path.open("rb") as stream:
+                content = stream.read(MAX_ADVISORY_BYTES + 1)
+            if len(content) > MAX_ADVISORY_BYTES:
+                raise ValueError(f"advisory too large: {path.name}")
+            yield path, json.loads(content)
+            continue
         with ZipFile(path) as archive:
             for member in archive.infolist():
                 if member.is_dir() or not member.filename.endswith(".json"):
@@ -139,17 +147,19 @@ def records(paths):
                 if member.file_size > MAX_ADVISORY_BYTES:
                     raise ValueError(f"advisory too large: {path.name}/{member.filename}")
                 try:
-                    yield json.loads(archive.read(member))
+                    yield path, json.loads(archive.read(member))
                 except ValueError as exc:
                     raise ValueError(f"invalid advisory: {path.name}/{member.filename}") from exc
 
 
 def epss_scores(path, requested):
-    if path is None or not requested:
-        return {}
+    if path is None:
+        return {}, None
     opener = gzip.open if path.suffix == ".gz" else Path.open
     with opener(path, "rt", encoding="utf-8-sig", newline="") as stream:
-        rows = csv.DictReader(line for line in stream if not line.startswith("#"))
+        first = stream.readline()
+        metadata = re.search(r"\bscore_date:(\d{4}-\d{2}-\d{2})", first) if first.startswith("#") else None
+        rows = csv.DictReader(chain([] if first.startswith("#") else [first], stream))
         if not {"cve", "epss"} <= set(rows.fieldnames or []):
             raise ValueError("EPSS file must include cve and epss columns")
         scores = {}
@@ -159,21 +169,30 @@ def epss_scores(path, requested):
                 if not 0 <= score <= 1:
                     raise ValueError("EPSS score must be between zero and one")
                 scores[row["cve"]] = score
-    return scores
+    return scores, metadata.group(1) if metadata else None
 
 
 def report(scope, inventory, archives, year=2026, kev=None, epss=None):
     index = approved_inventory(scope, inventory)
-    known_exploited = (
-        {row["cveID"] for row in load_json(kev)["vulnerabilities"]} if kev else set()
-    )
+    kev_data = load_json(kev) if kev else {}
+    known_exploited = {row["cveID"] for row in kev_data["vulnerabilities"]} if kev else set()
     findings = {}
     by_ecosystem = defaultdict(list)
     for key in index:
         by_ecosystem[key[0]].append(key)
     counts = dict(records_read=0, published_in_year=0, missing_publication=0, withdrawn=0)
-    for advisory in records(archives):
+    latest = dict.fromkeys(archives)
+    assessed = {}
+    status_priority = {"no_version_match": 0, "version_match": 1, "review_required": 2}
+    for source, advisory in records(archives):
         counts["records_read"] += 1
+        modified = advisory.get("modified")
+        if modified:
+            timestamp = datetime.fromisoformat(modified)
+            if timestamp.tzinfo is None:
+                raise ValueError("OSV modified timestamp must have a timezone")
+            if latest[source] is None or timestamp > latest[source]:
+                latest[source] = timestamp
         if advisory.get("withdrawn"):
             counts["withdrawn"] += 1
             continue
@@ -197,6 +216,11 @@ def report(scope, inventory, archives, year=2026, kev=None, epss=None):
             for package_id in keys:
                 for asset, version in index.get(package_id, ()):
                     assessment = assess_version(version, ecosystem, affected)
+                    component = (*package_id, asset, version)
+                    status = assessment[0] if assessment else "no_version_match"
+                    previous = assessed.get(component, "no_version_match")
+                    if status_priority[status] >= status_priority[previous]:
+                        assessed[component] = status
                     if assessment is None:
                         continue
                     status, evidence = assessment
@@ -204,13 +228,18 @@ def report(scope, inventory, archives, year=2026, kev=None, epss=None):
                     finding = findings.setdefault(key, dict(
                         advisory=advisory_id, ecosystem=ecosystem, name=package_id[1], asset=asset,
                         version=version, status=status, evidence=evidence, published=published,
-                        cves=[],
+                        cves=[], references=[
+                            ref["url"] for ref in advisory.get("references", [])
+                            if ref.get("type") == "ADVISORY" and ref.get("url")
+                        ],
                     ))
                     finding["cves"] = sorted(set(finding["cves"]) | set(cves))
                     if status == "version_match":
                         finding.update(status=status, evidence=evidence)
 
-    scores = epss_scores(epss, {cve for finding in findings.values() for cve in finding["cves"]})
+    scores, score_date = epss_scores(
+        epss, {cve for finding in findings.values() for cve in finding["cves"]}
+    )
     for finding in findings.values():
         cves = finding["cves"]
         finding["kev"] = sorted(known_exploited.intersection(cves)) if kev else None
@@ -224,9 +253,23 @@ def report(scope, inventory, archives, year=2026, kev=None, epss=None):
             finding["ecosystem"], finding["name"], finding["version"] or "",
         )
 
+    component_count = sum(map(len, index.values()))
+    component_coverage = dict(
+        no_advisory_data=component_count - len(assessed),
+        no_version_match=0, version_match=0, review_required=0,
+    )
+    for status in assessed.values():
+        component_coverage[status] += 1
     return dict(
         publication_year=year, archives=[path.name for path in archives],
         kev_snapshot=kev.name if kev else None, epss_snapshot=epss.name if epss else None,
-        components_reviewed=sum(map(len, index.values())), coverage=counts,
+        sources=dict(
+            osv=[dict(file=path.name, latest_record_modified_utc=(
+                latest[path].astimezone(timezone.utc).isoformat() if latest[path] else None
+            )) for path in archives],
+            kev_catalog_version=kev_data.get("catalogVersion"),
+            epss_score_date=score_date,
+        ),
+        components_reviewed=component_count, coverage=counts, component_coverage=component_coverage,
         findings=sorted(findings.values(), key=priority),
     )

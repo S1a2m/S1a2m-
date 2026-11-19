@@ -37,6 +37,7 @@ class AdvisoryTests(unittest.TestCase):
         advisory = {
             "id": "TEST-2026-A", "aliases": ["CVE-2026-999001"],
             "published": "2026-01-01T00:00:00Z",
+            "modified": "2026-01-02T12:00:00+02:00",
             "affected": [{"package": {"ecosystem": "PyPI", "name": "demo-lib"},
                           "ranges": [{"type": "ECOSYSTEM", "events": [
                               {"introduced": "0"}, {"fixed": "2.0"}]}]}],
@@ -72,6 +73,29 @@ class AdvisoryTests(unittest.TestCase):
         self.assertEqual(rows[0]["kev"], ["CVE-2026-999002"])
         self.assertEqual(rows[1]["epss"], 0.5)
         self.assertEqual(rows[1]["version"], "1.9")
+        self.assertEqual(result["sources"]["epss_score_date"], "2026-03-02")
+        self.assertEqual(result["sources"]["osv"][0]["latest_record_modified_utc"],
+                         "2026-01-02T10:00:00+00:00")
+        self.assertEqual(result["component_coverage"], {
+            "no_advisory_data": 0, "no_version_match": 1, "version_match": 1, "review_required": 1,
+        })
+
+    def test_php_vendor_advisories_across_all_four_release_lines(self):
+        versions = ["8.2.34", "8.3.35", "8.4.26", "8.5.11",
+                    "8.2.35", "8.3.36", "8.4.27", "8.5.12", None]
+        inventory = self.write_json("php.json", {"components": [
+            {"asset": "test-service", "ecosystem": "PHP", "name": "php-src", "version": version}
+            for version in versions
+        ] + [{"asset": "test-service", "ecosystem": "PHP", "name": "unmapped", "version": "1.0.0"}]})
+        data = Path(__file__).resolve().parents[1] / "data" / "php"
+        result = report(self.scope, inventory, sorted(data.glob("*.json")))
+        self.assertEqual(result["component_coverage"], {
+            "no_advisory_data": 1, "no_version_match": 4, "version_match": 4, "review_required": 1,
+        })
+        for cve in ["CVE-2026-109618", "CVE-2026-109619"]:
+            rows = [row for row in result["findings"] if cve in row["cves"]]
+            self.assertEqual({row["version"] for row in rows}, set(versions[:4] + [None]))
+            self.assertTrue(all(row["references"] for row in rows))
 
     def test_rejects_unapproved_asset_before_opening_feed(self):
         inventory = self.write_json("other.json", {
